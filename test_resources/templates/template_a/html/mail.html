@@ -1,0 +1,5 @@
+{% extends "base_mail.html" %}
+
+{% block head %}<meta charset="utf-8">{% endblock head %}
+
+{% block body %}logo: <img src="cid:{{cids.logo}}"> Hy {{data.name}}.{% endblock body %}
