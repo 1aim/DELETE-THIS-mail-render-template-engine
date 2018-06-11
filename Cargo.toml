@@ -15,7 +15,7 @@ mail-types = { git="https://github.com/1aim/mail-types" }
 mail-common = { git="https://github.com/1aim/mail-common" }
 mail-headers = { git="https://github.com/1aim/mail-headers" }
 mail-template = { git="https://github.com/1aim/mail-template" }
-vec1 = { git="https://github.com/1aim/vec1" }
+vec1 = "1.0"
 
 failure = "0.1.1"
 futures = "0.1.14"
