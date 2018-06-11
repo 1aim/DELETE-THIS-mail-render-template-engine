@@ -24,7 +24,7 @@ serde_derive = "1.0.64"
 lazy_static = "1.0.1"
 # we need the mime types by suffix functionallity
 conduit-mime-types = "0.7.3"
-soft-ascii-string = "0.2.0"
+soft-ascii-string = "1.0"
 tera = { version = "0.11.7", optional=true }
 
 
