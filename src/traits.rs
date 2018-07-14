@@ -14,6 +14,10 @@ use ::spec::{TemplateSpec, SubTemplateSpec};
 /// are meant to be the same for any `D` the functionality
 /// was separated into this trait.
 pub trait RenderEngineBase {
+
+    /// indicates if the new template engine guarantees that
+    /// the engine produces strings which contains only "\r\n"
+    /// newlines, i.e. newlines valid in mail bodies
     const PRODUCES_VALID_NEWLINES: bool;
 
     /// Error which can be produced when rendering a
@@ -137,3 +141,78 @@ impl<'a> Serialize for AdditionalCIds<'a> {
 
 
 
+/// This macros helps implementing `RenderEngineBase::load_templates`
+/// the way is used for `Handlebars` and `Tera`.
+///
+/// This will generate a method body (including a final return!)
+/// it also will generate 2 helper methods:
+/// - try_add_sub_template
+/// - error_cleanup
+///
+/// But as this is normally used inside the `load_templates` method
+/// there is normally no problem with the namespace.
+#[macro_export]
+macro_rules! implement_load_helper {
+    (
+        input::<$EType:ty>($spec:expr, $get_engine:expr);
+        error($LError:ty);
+        collision_error_fn(|$col_id:ident| $col_code:block);
+        has_template_fn(|$ht_engine:ident, $ht_id:ident| $has_template_code:block);
+        remove_fn(|$rm_engine:ident, $rm_id:ident| $rm_code:block);
+        add_file_fn(|$af_engine:ident, $path:ident| $add_file_code:block);
+        add_content_fn(|$ac_engine:ident, $id:ident, $content:ident| $add_content:block);
+    ) => ({
+        let mut loaded = Vec::new();
+
+        for sub_spec in $spec.sub_specs() {
+            match *sub_spec.source() {
+                TemplateSource::Path(ref path) => {
+                    let $path = path;
+                    try_add_sub_template(
+                        $get_engine,
+                        path,
+                        &mut loaded,
+                        |$af_engine| { $add_file_code }
+                    )?;
+                },
+                TemplateSource::Source { ref id, ref content } => {
+                    let $id = id;
+                    let $content = content;
+                    try_add_sub_template(
+                        $get_engine,
+                        id,
+                        &mut loaded,
+                        |$ac_engine| { $add_content }
+                    )?;
+                }
+            }
+        }
+        return Ok(());
+
+        fn try_add_sub_template<'s, 'l: 's>(
+            $ht_engine: &'s mut $EType,
+            $ht_id: &'l str,
+            loaded: &'s mut Vec<&'l str>,
+            add_op: impl FnOnce(&mut $EType) -> Result<(), $LError>
+        ) -> Result<(), $LError> {
+
+            if $has_template_code {
+                error_cleanup($ht_engine, loaded);
+                let $col_id = $ht_id.to_owned();
+                return Err($col_code);
+            }
+            if let Err(error) = add_op($ht_engine) {
+                error_cleanup($ht_engine, loaded);
+                return Err(error);
+            }
+            loaded.push($ht_id);
+            Ok(())
+        }
+
+        fn error_cleanup($rm_engine: &mut $EType, added_names: &Vec<&str>) {
+            for $rm_id in added_names {
+                $rm_code ;
+            }
+        }
+    });
+}
