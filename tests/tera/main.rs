@@ -32,7 +32,11 @@ use mail::default_impl::simple_context;
 use headers::components::{Email, Domain};
 use headers::HeaderTryFrom;
 use template::{MailSendData, InspectEmbeddedResources, Embedded};
-use render_template_engine::{RenderTemplateEngine, DEFAULT_SETTINGS};
+
+use render_template_engine::{
+    RenderTemplateEngine, DEFAULT_SETTINGS,
+    TemplateSpec
+};
 use render_template_engine::tera::TeraRenderEngine;
 
 
@@ -51,7 +55,14 @@ fn setup_context() -> simple_context::Context {
 fn setup_template_engine() -> RenderTemplateEngine<TeraRenderEngine> {
     let tera = TeraRenderEngine::new("./test_resources/tera_base/**/*").unwrap();
     let mut rte = RenderTemplateEngine::new(tera);
-    rte.load_specs_from_dir("./test_resources/templates", &*DEFAULT_SETTINGS).unwrap();
+    let specs = TemplateSpec
+        ::from_dirs("./test_resources/templates",  &*DEFAULT_SETTINGS)
+        .unwrap();
+
+    for (id, spec) in specs {
+        rte.insert_spec(id, spec).unwrap();
+    }
+
     rte
 }
 

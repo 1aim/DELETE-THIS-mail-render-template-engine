@@ -1,7 +1,6 @@
 use failure::Backtrace;
 use tera_crate;
 
-use ::FromUnknownTemplateId;
 
 #[derive(Debug, Fail)]
 pub enum TeraError {
@@ -9,17 +8,13 @@ pub enum TeraError {
     #[fail(display="unknown template id: {}", id)]
     UnknowTemplateId { id: String },
 
+    #[fail(display="template id is used multiple times for different templates: {}", id)]
+    TemplateIdCollision { id: String },
+
     #[fail(display="{}", kind)]
     RenderError {
         kind: tera_crate::ErrorKind,
         backtrace: Backtrace
-    }
-}
-
-
-impl FromUnknownTemplateId<str> for TeraError {
-    fn from_unknown_template_id(template_id: &str) -> Self {
-        TeraError::UnknowTemplateId { id: template_id.to_owned() }
     }
 }
 

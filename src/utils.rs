@@ -1,5 +1,4 @@
-use std::mem::replace;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::ffi::OsStr;
 use std::process::Command;
 use std::io;
@@ -10,7 +9,7 @@ use conduit_mime_types::Types as TypesBySuffix;
 
 use headers::components::MediaType;
 
-use ::error::{LoadingSpecError, LoadingSpecErrorVariant};
+use ::error::{CreatingSpecError, CreatingSpecErrorVariant};
 
 lazy_static! {
     static ref TYPES_BY_SUFFIX: TypesBySuffix = {
@@ -19,50 +18,50 @@ lazy_static! {
     };
 }
 
-pub(crate) fn string_path_set(field: &mut String, new_path: &Path) -> Result<PathBuf, LoadingSpecError> {
-    let path = new_string_path(new_path)?;
-    let old = replace(field, path);
-    Ok(PathBuf::from(old))
-}
+// pub(crate) fn string_path_set(field: &mut String, new_path: &Path) -> Result<PathBuf, CreatingSpecError> {
+//     let path = new_string_path(new_path)?;
+//     let old = replace(field, path);
+//     Ok(PathBuf::from(old))
+// }
 
-pub(crate) fn new_string_path<S>(path: S) -> Result<String, LoadingSpecError>
+pub(crate) fn new_string_path<S>(path: S) -> Result<String, CreatingSpecError>
     where S: AsRef<OsStr>
 {
     new_str_path(&path.as_ref()).map(|s|s.to_owned())
 }
 
-pub(crate) fn new_str_path<S>(path: &S) -> Result<&str, LoadingSpecError>
+pub(crate) fn new_str_path<S>(path: &S) -> Result<&str, CreatingSpecError>
     where S: AsRef<OsStr>
 {
     let path = path.as_ref();
     if let Some(path) = path.to_str() {
         Ok(path)
     } else {
-        Err(LoadingSpecErrorVariant::NonStringPath(path.to_owned().into()).into())
+        Err(CreatingSpecErrorVariant::NonStringPath(path.to_owned().into()).into())
     }
 }
 
-pub(crate) fn check_string_path(path: &Path) -> Result<(), LoadingSpecError> {
+pub(crate) fn check_string_path(path: &Path) -> Result<(), CreatingSpecError> {
     if path.to_str().is_none() {
-        Err(LoadingSpecErrorVariant::NonStringPath(path.into()).into())
+        Err(CreatingSpecErrorVariant::NonStringPath(path.into()).into())
     } else {
         Ok(())
     }
 }
 
 
-pub(crate) fn sniff_media_type(path: &Path) -> Result<MediaType, LoadingSpecError> {
+pub(crate) fn sniff_media_type(path: &Path) -> Result<MediaType, CreatingSpecError> {
     //this does not work for
     // 1. multi part extensions like .tar.gz
     // 2. types not supported by conduit-media-types (which, btw. include .tar.gz /.tgz)
     let extension = path.extension()
         .and_then(|extension| extension.to_str())
-        .ok_or_else(|| LoadingSpecErrorVariant::NoValidFileStem { file: path.into() })?;
+        .ok_or_else(|| CreatingSpecErrorVariant::NoValidFileStem { file: path.into() })?;
 
     // 1. determine media type by file ending
     let by_extension_str_media_type = TYPES_BY_SUFFIX
         .get_mime_type(extension)
-        .ok_or_else(|| LoadingSpecErrorVariant::NoMediaTypeFor { stem: extension.to_owned() })?;
+        .ok_or_else(|| CreatingSpecErrorVariant::NoMediaTypeFor { stem: extension.to_owned() })?;
 
     // 2. determine media type by file
     let media_type = sniff_with_file_cmd(path)?;
@@ -74,7 +73,7 @@ pub(crate) fn sniff_media_type(path: &Path) -> Result<MediaType, LoadingSpecErro
         // text/plain (the file ending). But we might also do so the other way around _iff_
         // we could get the actual probabilities for both the extension based and the file ending based
         // one
-        return Err(LoadingSpecErrorVariant::FileStemAndContentDifferInMediaType {
+        return Err(CreatingSpecErrorVariant::FileStemAndContentDifferInMediaType {
             path: path.into(),
             by_extension: by_extension_str_media_type.to_owned(),
             by_content: media_type.full_type().to_string()
@@ -86,7 +85,7 @@ pub(crate) fn sniff_media_type(path: &Path) -> Result<MediaType, LoadingSpecErro
 }
 
 
-pub(crate) fn sniff_with_file_cmd(path: &Path) -> Result<MediaType, LoadingSpecError> {
+pub(crate) fn sniff_with_file_cmd(path: &Path) -> Result<MediaType, CreatingSpecError> {
     let out = Command::new("file")
         .args(&["-b", "--mime"])
         .arg(path)
@@ -110,11 +109,11 @@ pub(crate) fn sniff_with_file_cmd(path: &Path) -> Result<MediaType, LoadingSpecE
 
     let media_type = String
         ::from_utf8(out.stdout)
-        .map_err(|err| err.context(LoadingSpecErrorVariant::NonUtf8MediaType))
+        .map_err(|err| err.context(CreatingSpecErrorVariant::NonUtf8MediaType))
         .and_then(|string| {
             //FEAT: make parse accept owned data
             MediaType::parse(string.trim())
-                .map_err(|err| err.context(LoadingSpecErrorVariant::NotAMediaType))
+                .map_err(|err| err.context(CreatingSpecErrorVariant::NotAMediaType))
         })?;
 
     Ok(media_type)
@@ -245,7 +244,7 @@ mod test {
     }
     mod sniff_media_type {
         use std::path::Path;
-        use ::error::LoadingSpecErrorVariant;
+        use ::error::CreatingSpecErrorVariant;
         use super::super::sniff_media_type;
 
         #[test]
@@ -276,7 +275,7 @@ mod test {
         fn sniff_conflicting_image() {
             let _path = Path::new("./test_resources/jpg_image.png");
             let err = sniff_media_type(_path).unwrap_err();
-            if let &LoadingSpecErrorVariant
+            if let &CreatingSpecErrorVariant
                 ::FileStemAndContentDifferInMediaType { ref path, ref by_extension, ref by_content }
                 = err.variant()
             {
