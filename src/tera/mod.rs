@@ -85,29 +85,15 @@ impl RenderEngineBase for TeraRenderEngine {
     type LoadingError = TeraError;
 
     fn load_templates(&mut self, spec: &TemplateSpec) -> Result<(), Self::LoadingError> {
-        let mut loaded = Vec::new();
-
-        for sub_spec in spec.sub_specs() {
-            match *sub_spec.source() {
-                TemplateSource::Path(ref path) => {
-                    try_add_sub_template(
-                        &mut self.tera,
-                        path,
-                        &mut loaded,
-                        |tera| Ok(tera.add_template_file(path, None)?)
-                    )?;
-                },
-                TemplateSource::Source { ref id, ref content } => {
-                    try_add_sub_template(
-                        &mut self.tera,
-                        id,
-                        &mut loaded,
-                        |tera| Ok(tera.add_raw_template(id, content)?)
-                    )?;
-                }
-            }
+        implement_load_helper! {
+            input::<Tera>(spec, &mut self.tera);
+            error(TeraError);
+            collision_error_fn(|id| { TeraError::TemplateIdCollision { id } });
+            has_template_fn(|tera, id| { tera.templates.contains_key(id) });
+            remove_fn(|tera, id| { tera.templates.remove(*id) });
+            add_file_fn(|tera, path| { Ok(tera.add_template_file(path, None)?) });
+            add_content_fn(|tera, id, content| { Ok(tera.add_raw_template(id, content)?) });
         }
-        Ok(())
     }
 
 
@@ -125,30 +111,6 @@ impl RenderEngineBase for TeraRenderEngine {
     }
 }
 
-
-fn try_add_sub_template<'s, 'l: 's>(
-    tera: &'s mut Tera,
-    id: &'l str,
-    loaded: &'s mut Vec<&'l str>,
-    add_op: impl FnOnce(&mut Tera) -> Result<(), TeraError>
-) -> Result<(), TeraError> {
-    if tera.templates.contains_key(id) {
-        error_cleanup(tera, loaded);
-        return Err(TeraError::TemplateIdCollision { id: id.to_owned() });
-    }
-    if let Err(error) = add_op(tera) {
-        error_cleanup(tera, loaded);
-        return Err(error);
-    }
-    loaded.push(id);
-    Ok(())
-}
-
-fn error_cleanup(tera: &mut Tera, added_names: &Vec<&str>) {
-    for name in added_names {
-        tera.templates.remove(*name);
-    }
-}
 
 #[derive(Serialize)]
 struct DataWrapper<'a,D: Serialize + 'a> {
