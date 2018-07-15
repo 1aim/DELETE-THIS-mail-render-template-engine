@@ -30,23 +30,6 @@ impl TeraRenderEngine {
         Ok(TeraRenderEngine { tera })
     }
 
-    //TODO chang it
-    /// Reloads all base templates, but no `RenderTemplateEngine` specific templates.
-    /// After a reload `RenderTemplateEngine` specific templates will be loaded when
-    /// they are used the next time.
-    ///
-    pub fn reload_base_only(&mut self) -> Result<(), TeraError> {
-        //full_reload doe NOT a full reload what it does is
-        // 1. discard all templates which are from a Tera::extend call
-        //    (yes you can't reload them at all)
-        // 2. load all templates from a glob
-        //
-        // No template path is used at all, even through all templates do have path's assigned
-        // them if they where added through a path, well this actually happens to be exactly what
-        // we want even through it's not what it says it is.
-        Ok(self.tera.full_reload()?)
-    }
-
     /// expose `Tera::register_filter`
     pub fn register_filter(&mut self, name: &str, filter: FilterFn) {
         self.tera.register_filter(name, filter);
@@ -65,13 +48,6 @@ impl TeraRenderEngine {
     /// exposes `Tera::autoescape_on`
     pub fn set_autoescape_file_suffixes(&mut self, suffixes: Vec<&'static str>) {
         self.tera.autoescape_on(suffixes)
-    }
-
-    //TODO chang it
-    /// preloads a `RenderTemplateEngine` template, templates loaded this
-    /// way will be discarded once `reload_base_only` is called.
-    pub fn preload_rte_template(&mut self, id: &str) -> Result<(), TeraError> {
-        Ok(self.tera.add_template_file(id, None)?)
     }
 
 }
