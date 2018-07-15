@@ -26,6 +26,7 @@ lazy_static = "1.0.1"
 conduit-mime-types = "0.7.3"
 soft-ascii-string = "1.0"
 tera = { version = "0.11.7", optional=true }
+handlebars = { version = "1.0.0-beta.4", optional=true }
 
 
 [dependencies.mime]
@@ -39,3 +40,4 @@ regex = "1"
 [features]
 default = []
 tera-engine = ["tera"]
+handlebars-engine = ["handlebars"]
