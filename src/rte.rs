@@ -23,7 +23,6 @@ pub struct RenderTemplateEngine<R>
     fix_newlines: bool,
     render_engine: R,
     id2spec: HashMap<String, TemplateSpec>,
-    global_embeddings: HashMap<String, EmbeddedWithCId>
 }
 
 
@@ -36,7 +35,6 @@ impl<R> RenderTemplateEngine<R>
             render_engine,
             id2spec: Default::default(),
             fix_newlines: !R::PRODUCES_VALID_NEWLINES,
-            global_embeddings: HashMap::new()
         }
     }
 
@@ -46,36 +44,6 @@ impl<R> RenderTemplateEngine<R>
 
     pub fn does_fix_newlines(&self) -> bool {
         self.fix_newlines
-    }
-
-    /// add a global embedding
-    ///
-    /// A global embedding wil be made implicitly available for each render call
-    /// through the `AdditionalCids` instance.
-    ///
-    /// If a template specifies an embedding with the same name as an global
-    /// embedding it will shadow the global embedding.
-    ///
-    /// Note that while the `name` can be any string, many render engines only
-    /// handle names which are valid idents (or at last only handle this values
-    /// in an nice way). Also what exactly an ident is depends on the render engine,
-    /// too. What always should work is a name starting with an ascii alphabetic
-    /// letter followed by any not to large number of other ascii alphanumeric
-    /// letters including `'_'`.
-    pub fn add_global_embedding(&mut self, name: String, value: EmbeddedWithCId) -> Option<EmbeddedWithCId> {
-        self.global_embeddings.insert(name, value)
-    }
-
-    /// remove a global embedding
-    ///
-    /// If no embedding with the given name exists `None` is returned.
-    pub fn remove_global_embedding(&mut self, name: &str) -> Option<EmbeddedWithCId> {
-        self.global_embeddings.remove(name)
-    }
-
-    /// access `name -> embedding` mapping of global embeddings
-    pub fn global_embeddings(&self) -> &HashMap<String, EmbeddedWithCId> {
-        &self.global_embeddings
     }
 
     /// add a `TemplateSpec`, loading all templates in it
@@ -206,7 +174,7 @@ impl<C, D, R> TemplateEngine<C, D> for RenderTemplateEngine<R>
                 .collect::<HashMap<_,_>>();
 
             let rendered = {
-                let embeddings = &[&embeddings, &shared_embeddings, self.global_embeddings()];
+                let embeddings = &[&embeddings, &shared_embeddings];
                 let additional_cids = AdditionalCIds::new(embeddings);
                 self.render_engine.render(sub_spec, data, additional_cids)?
             };
