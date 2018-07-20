@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use mail::{Resource, Context};
 use mail::file_buffer::FileBuffer;
@@ -9,10 +10,11 @@ use template::{
     BodyPart, MailParts
 };
 
-use ::error::InsertionError;
+use ::error::{LoadingError, InsertionError};
 use ::utils::fix_newlines;
 use ::spec::TemplateSpec;
 use ::traits::{RenderEngine, RenderEngineBase, AdditionalCIds};
+use ::settings::LoadSpecSettings;
 
 #[derive(Debug)]
 pub struct RenderTemplateEngine<R>
@@ -147,10 +149,32 @@ impl<R> RenderTemplateEngine<R>
         &self.id2spec
     }
 
+    pub fn specs_mut(&mut self) -> impl Iterator<Item=(&String, &mut TemplateSpec)> {
+        self.id2spec.iter_mut()
+    }
+
     pub fn lookup_spec(&self, template_id: &str) -> Option<&TemplateSpec> {
         self.id2spec.get(template_id)
     }
 
+    /// each folder in `templates_dir` is seen as a TemplateSpec
+    ///
+    /// # Error
+    ///
+    /// If an error can occur when creating the spec(s), or when inserting/using
+    /// them. If such an error occurs all previously added Spec are not removed,
+    /// i.e. if an error happens some spec and embeddings might be added others
+    /// might not.
+    pub fn load_templates(
+        &mut self,
+        templates_dir: impl AsRef<Path>,
+        settings: &LoadSpecSettings
+    ) -> Result<(), LoadingError<R::LoadingError>> {
+        for (name, spec) in TemplateSpec::from_dirs(templates_dir.as_ref(), settings)? {
+            self.insert_spec(name, spec)?;
+        }
+        Ok(())
+    }
 }
 
 impl<C, D, R> TemplateEngine<C, D> for RenderTemplateEngine<R>

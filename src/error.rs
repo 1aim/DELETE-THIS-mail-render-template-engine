@@ -9,6 +9,38 @@ use failure::{Fail, Backtrace, Context};
 //circular dependency (error <-> rte) but ok here
 use ::spec::TemplateSpec;
 
+#[derive(Debug, Fail)]
+pub enum LoadingError<E: Fail> {
+    #[fail(display = "{}", _0)]
+    SpecCreation(CreatingSpecError),
+    #[fail(display = "{}", _0)]
+    SpecUsage(InsertionError<E>)
+}
+
+impl<E> From<CreatingSpecError> for LoadingError<E>
+    where E: Fail
+{
+    fn from(err: CreatingSpecError) -> Self {
+        LoadingError::SpecCreation(err)
+    }
+}
+
+impl<E> From<InsertionError<E>> for LoadingError<E>
+    where E: Fail
+{
+    fn from(err: InsertionError<E>) -> Self {
+        LoadingError::SpecUsage(err)
+    }
+}
+
+impl<E> From<io::Error> for LoadingError<E>
+    where E: Fail
+{
+    fn from(err: io::Error) -> Self {
+        CreatingSpecError::from(err).into()
+    }
+}
+
 #[derive(Debug)]
 pub struct InsertionError<E: Fail> {
     pub error: E,

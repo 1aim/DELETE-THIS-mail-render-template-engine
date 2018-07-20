@@ -87,7 +87,9 @@ struct FindResult {
 
 }
 
-fn find_files(in_dir: &Path, settings: &LoadSpecSettings) -> Result<FindResult, CreatingSpecError> {
+fn find_files(in_dir: &Path, settings: &LoadSpecSettings)
+    -> Result<FindResult, CreatingSpecError>
+{
     use std::collections::hash_map::Entry::*;
 
     let mut template_file = None;
