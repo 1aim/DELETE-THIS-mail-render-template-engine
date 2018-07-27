@@ -1,9 +1,21 @@
-use std::sync::RwLock;
+use std::collections::HashSet;
+use std::path::Path;
+use std::io::Read;
+use std::ops::Deref;
 
 use serde::Serialize;
-use handlebars_crate::{Handlebars, RenderError, TemplateError};
+use handlebars_crate::{
+    Handlebars, RenderError,
+    HelperDef, DecoratorDef
+};
 
-use ::{RenderEngineBase, RenderEngine, AdditionalCIds};
+use ::{
+    RenderEngineBase, RenderEngine,
+    AdditionalCIds,
+    TemplateSpec, SubTemplateSpec,
+    TemplateSource
+};
+
 
 use self::error::LoadingError;
 
@@ -49,7 +61,7 @@ impl HandlebarsRenderEngine {
     /// The default of `HandlebarsRenderEngine` is to _enable_ it.
     /// But the default of handle bar is to not enable it.
     pub fn set_strict_mode(&mut self, enabled: bool) {
-        self.handlebars.strict_mode()
+        self.handlebars.set_strict_mode(enabled)
     }
 
     /// get a mut reference to inner handlebars object
@@ -86,7 +98,7 @@ impl HandlebarsRenderEngine {
         where S: AsRef<str>
     {
         let tpl = tpl.as_ref();
-        self.insert_free_template(name, |hbs| hbs.regisert_free_template_string(name, tpl))
+        self.insert_free_template(name, |hbs| Ok(hbs.register_template_string(name, tpl)?))
     }
 
     /// Registers a free partial.
@@ -104,7 +116,7 @@ impl HandlebarsRenderEngine {
         where S: AsRef<str>
     {
         let partial = partial.as_ref();
-        self.insert_free_template(name, |hbs| hbs.register_free_partial(name, partial))
+        self.insert_free_template(name, |hbs| Ok(hbs.register_partial(name, partial)?))
     }
 
     /// Registers a free template based on the content of an file.
@@ -119,7 +131,7 @@ impl HandlebarsRenderEngine {
         where P: AsRef<Path>
     {
         let path = path.as_ref();
-        self.insert_free_template(name, |hbs| hbs.register_template_file(name, path))
+        self.insert_free_template(name, |hbs| Ok(hbs.register_template_file(name, path)?))
     }
 
     // TODO I have to reproduce this function and can't just wrap it!
@@ -142,7 +154,7 @@ impl HandlebarsRenderEngine {
         name: &str,
         source: &mut Read
     ) -> Result<(), LoadingError> {
-        self.insert_free_template(name, |hbs| hbs.register_template_source(name, source))
+        self.insert_free_template(name, |hbs| Ok(hbs.register_template_source(name, source)?))
     }
 
     /// Unregister a free template if there is a free template with the given name.
@@ -172,15 +184,15 @@ impl HandlebarsRenderEngine {
         name: &str,
         def: Box<HelperDef + 'static>
     ) -> Option<Box<HelperDef + 'static>> {
-        self.register_helper(name, def)
+        self.handlebars.register_helper(name, def)
     }
 
     /// Register an decorator to the inner `Handlebars` instance.
     pub fn register_decorator(
         &mut self,
         name: &str,
-        def: Box<DirectiveDef + 'static>
-    ) -> Option<Box<DirectiveDef + 'static>> {
+        def: Box<DecoratorDef + 'static>
+    ) -> Option<Box<DecoratorDef + 'static>> {
         self.handlebars.register_decorator(name, def)
     }
 
@@ -201,23 +213,23 @@ impl HandlebarsRenderEngine {
 
     fn check_new_free_template_name(&self, name: &str) -> Result<(), LoadingError> {
         if !self.free_templates.contains(name) && self.handlebars.get_template(name).is_some() {
-            Err(LoadingError::FreeTemplateIdCollision { id: name.to_owned() });
+            Err(LoadingError::FreeTemplateIdCollision { id: name.to_owned() })
         } else {
             Ok(())
         }
     }
 
-    fn insert_free_template<F>(&mut self, name, insert_fn: F) -> Result<(), LoadingError>
+    fn insert_free_template<F>(&mut self, name: &str, insert_fn: F) -> Result<(), LoadingError>
         where F: FnOnce(&mut Handlebars) -> Result<(), LoadingError>
     {
         self.check_new_free_template_name(name)?;
         let ok = insert_fn(&mut self.handlebars)?;
         self.free_templates.insert(name.to_owned());
-        Ok(())
+        Ok(ok)
     }
 }
 
-impl RenderEngineBase for TeraRenderEngine {
+impl RenderEngineBase for HandlebarsRenderEngine {
 
     /// templates might not use "\r\n" line endings
     const PRODUCES_VALID_NEWLINES: bool = false;
@@ -238,7 +250,7 @@ impl RenderEngineBase for TeraRenderEngine {
     }
 
     fn unload_templates(&mut self, spec: &TemplateSpec) {
-        for sub_spec in sepc.sub_specs() {
+        for sub_spec in spec.sub_specs() {
             self.handlebars.unregister_template(sub_spec.source().id());
         }
     }
@@ -258,10 +270,12 @@ impl<D> RenderEngine<D> for HandlebarsRenderEngine
     where D: Serialize
 {
 
-    fn render(&self, spec: &SubTemplateSpec, data: &D, cids: AdditionalCIds) -> Result<String, Self::Error> {
+    fn render(&self, spec: &SubTemplateSpec, data: &D, cids: AdditionalCIds)
+        -> Result<String, Self::RenderError>
+    {
         let data = &DataWrapper { data, cids };
         let id = spec.source().id();
-        Ok(self.handlebars.render(id, data)?);
+        Ok(self.handlebars.render(id, data)?)
     }
 }
 
@@ -270,11 +284,11 @@ impl<D> RenderEngine<D> for HandlebarsRenderEngine
 /// This will implicitly enable the strict mode.
 impl From<Handlebars> for HandlebarsRenderEngine {
     fn from(mut handlebars: Handlebars) -> Self {
-        let mut free_templates = Default::default();
+        let mut free_templates = HashSet::new();
         for name in handlebars.get_templates().keys() {
             free_templates.insert(name.clone());
         }
-        handlebars.set_strict(true);
+        handlebars.set_strict_mode(true);
         HandlebarsRenderEngine { handlebars, free_templates }
     }
 }

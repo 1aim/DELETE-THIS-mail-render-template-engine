@@ -15,12 +15,13 @@ extern crate conduit_mime_types;
 extern crate lazy_static;
 extern crate serde;
 
-#[cfg(any(feature="tera-engine", failure="handlebars-engine"))]
+
+#[cfg(any(feature="tera-engine", feature="handlebars-engine"))]
 #[macro_use]
 extern crate serde_derive;
 #[cfg(feature="tera-engine")]
 extern crate tera as tera_crate;
-#[cfg(future="handlebars-engine")]
+#[cfg(feature="handlebars-engine")]
 extern crate handlebars as handlebars_crate;
 
 // ordered by possible "dependentness",
@@ -38,7 +39,7 @@ mod traits;
 mod rte;
 #[cfg(feature="tera-engine")]
 pub mod tera;
-#[cfg(future="handlebars-engine")]
+#[cfg(feature="handlebars-engine")]
 pub mod handlebars;
 
 pub use self::settings::*;
